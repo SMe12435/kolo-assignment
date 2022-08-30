@@ -1,13 +1,17 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-redis/redis/v8"
+	"kolo-assignment/config"
 	"net/http"
 )
 
 type ComicService struct {
 	version string
+	redis   *redis.Client
 }
 
 type Comic struct {
@@ -64,13 +68,14 @@ type GetComicApiResponse struct {
 }
 
 type SearchCharacterApiResponse struct {
-	offset     int                   `json:"offset"`
-	characters []GetComicApiResponse `json:"characters"`
+	Characters []GetComicApiResponse `json:"characters"`
+	Offset     int                   `json:"offset"`
 }
 
-func NewComicService() *ComicService {
+func NewComicService(redis *redis.Client) *ComicService {
 	return &ComicService{
 		version: "v2",
+		redis:   redis,
 	}
 }
 
@@ -119,8 +124,35 @@ func (s *ComicService) GetComic() (result []GetComicApiResponse, err error) {
 }
 
 func (s *ComicService) SearchCharacter(searchKey string, offset string, limit string) (result SearchCharacterApiResponse, err error) {
+	//initialised redis for caching
+	var ctx = context.Background()
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     config.Get().RedisAddr,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
 
-	url := "https://gateway.marvel.com/v1/public/characters?limit=" + limit + "&offset=" + offset + "&nameStartsWith=" + searchKey + "&ts=1661705205195&apikey=ce021c5ac52ea1591e09548b6043d2c7&hash=feb2ab81114c86cb8866d8de2cb13a0e"
+	//gets value for an offset if it is stored in cache.
+	/*
+		Better way to approach here could have been
+		to get max data from Marvel API i.e. 100 and
+		send to user using offsets
+	*/
+	val, err := rdb.Get(ctx, searchKey+"_"+offset).Result()
+
+	if err == redis.Nil {
+	} else if err != nil {
+		panic(err)
+	} else {
+		//in case data is found in the cache, returns the data to the user
+		err = json.Unmarshal([]byte(val), &result)
+		if err != nil {
+			panic(err)
+		}
+		return result, err
+	}
+	//otherwise send a request to marvel api for data
+	url := "https://gateway.marvel.com/v1/public/characters?limit=" + limit + "&offset=" + offset + "&nameStartsWith=" + searchKey + "&ts=1661705205195&apikey=" + config.Get().MarvelApiKey + "&hash=feb2ab81114c86cb8866d8de2cb13a0e"
 	method := "GET"
 
 	client := &http.Client{}
@@ -130,6 +162,9 @@ func (s *ComicService) SearchCharacter(searchKey string, offset string, limit st
 		fmt.Println(err)
 	}
 	res, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
 
 	defer res.Body.Close()
 
@@ -146,12 +181,25 @@ func (s *ComicService) SearchCharacter(searchKey string, offset string, limit st
 		tempSearchCharResp = append(tempSearchCharResp, tempCharacter)
 	}
 
-	result.characters = tempSearchCharResp
-	result.offset = tempRes.Data.Offset
+	result.Characters = tempSearchCharResp
+	result.Offset = tempRes.Data.Offset
 
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	//fmt.Println(result)
+
+	red := &result
+	redisSetString, err := json.Marshal(red)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	//sets redis key
+	err = rdb.Set(ctx, searchKey+"_"+offset, string(redisSetString), 0).Err()
+	if err != nil {
+		panic(err)
+	}
 	return result, err
+
 }

@@ -37,5 +37,5 @@ func (s *ComicController) SearchCharacter(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": true, "message": err.Error()})
 	}
 	//fmt.Println(characters)
-	c.JSON(http.StatusOK, gin.H{"characters": characters.characters, "offset": characters.offset})
+	c.JSON(http.StatusOK, gin.H{"characters": characters.Characters, "offset": characters.Offset})
 }

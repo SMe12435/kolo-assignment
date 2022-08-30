@@ -8,6 +8,7 @@ require (
 	github.com/getsentry/sentry-go v0.11.0
 	github.com/gin-gonic/gin v1.6.2
 	github.com/go-redis/redis v6.15.7+incompatible
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/joho/godotenv v1.3.0
 	github.com/olivere/elastic/v7 v7.0.14
@@ -16,5 +17,5 @@ require (
 	go.elastic.co/apm/module/apmgoredis v1.7.2
 	go.elastic.co/apm/module/apmsql v1.7.2
 	go.uber.org/zap v1.14.1
-	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 )
