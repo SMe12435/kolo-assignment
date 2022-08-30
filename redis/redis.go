@@ -1,34 +1,31 @@
 package redis
 
 import (
+	"context"
+	"github.com/go-redis/redis/v8"
 	"sync"
-
-	"kolo-assignment/config"
-
-	"github.com/go-redis/redis"
 )
 
-var clusterClient *redis.ClusterClient
+var client *redis.Client
 var once sync.Once
-
-func NewRedisClient(clusterAdd []string) *redis.ClusterClient {
-	redisClusterClient := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs: clusterAdd,
-	})
-	return redisClusterClient
-}
 
 func Init() {
 	once.Do(func() {
-		clusterAdd := []string{config.Get().RedisAddr}
-		clusterClient = NewRedisClient(clusterAdd)
-		_, err := clusterClient.Ping().Result()
+		var ctx = context.Background()
+		rdb := redis.NewClient(&redis.Options{
+			Addr:     "localhost:6379",
+			Password: "", // no password set
+			DB:       0,  // use default DB
+		})
+
+		err := rdb.Set(ctx, "key", "valuefjsdjsnd", 0).Err()
 		if err != nil {
-			panic(err.Error())
+			panic(err)
 		}
+
 	})
 }
 
-func GetClient() *redis.ClusterClient {
-	return clusterClient
+func Client() *redis.Client {
+	return client
 }

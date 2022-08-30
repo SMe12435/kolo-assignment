@@ -1,6 +1,9 @@
 package v1
 
-import "sync"
+import (
+	"github.com/go-redis/redis/v8"
+	"sync"
+)
 
 type ComicModule struct {
 	controller *ComicController
@@ -10,9 +13,9 @@ type ComicModule struct {
 var comicModuleSingleton *ComicModule
 var comicModuleOnce sync.Once
 
-func NewComicModule() *ComicModule {
+func NewComicModule(redis *redis.Client) *ComicModule {
 	comicModuleOnce.Do(func() {
-		service := NewComicService()
+		service := NewComicService(redis)
 		controller := NewComicController()
 		comicModuleSingleton = &ComicModule{
 			service:    service,

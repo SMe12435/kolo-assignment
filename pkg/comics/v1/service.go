@@ -3,11 +3,13 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/go-redis/redis/v8"
 	"net/http"
 )
 
 type ComicService struct {
 	version string
+	redis   *redis.Client
 }
 
 type Comic struct {
@@ -68,9 +70,10 @@ type SearchCharacterApiResponse struct {
 	characters []GetComicApiResponse `json:"characters"`
 }
 
-func NewComicService() *ComicService {
+func NewComicService(redis *redis.Client) *ComicService {
 	return &ComicService{
 		version: "v2",
+		redis:   redis,
 	}
 }
 
@@ -120,6 +123,10 @@ func (s *ComicService) GetComic() (result []GetComicApiResponse, err error) {
 
 func (s *ComicService) SearchCharacter(searchKey string, offset string, limit string) (result SearchCharacterApiResponse, err error) {
 
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	url := "https://gateway.marvel.com/v1/public/characters?limit=" + limit + "&offset=" + offset + "&nameStartsWith=" + searchKey + "&ts=1661705205195&apikey=ce021c5ac52ea1591e09548b6043d2c7&hash=feb2ab81114c86cb8866d8de2cb13a0e"
 	method := "GET"
 
@@ -154,4 +161,8 @@ func (s *ComicService) SearchCharacter(searchKey string, offset string, limit st
 	}
 	//fmt.Println(result)
 	return result, err
+}
+
+func (s *ComicService) GetChracterRedisKey(keyword string, offset string) string {
+	return "CS:keyword:offset" + keyword + offset
 }
