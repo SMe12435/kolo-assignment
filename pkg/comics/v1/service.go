@@ -1,9 +1,11 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"kolo-assignment/config"
 	"net/http"
 )
 
@@ -66,8 +68,8 @@ type GetComicApiResponse struct {
 }
 
 type SearchCharacterApiResponse struct {
-	offset     int                   `json:"offset"`
-	characters []GetComicApiResponse `json:"characters"`
+	Characters []GetComicApiResponse `json:"characters"`
+	Offset     int                   `json:"offset"`
 }
 
 func NewComicService(redis *redis.Client) *ComicService {
@@ -123,8 +125,27 @@ func (s *ComicService) GetComic() (result []GetComicApiResponse, err error) {
 
 func (s *ComicService) SearchCharacter(searchKey string, offset string, limit string) (result SearchCharacterApiResponse, err error) {
 
-	if err != nil {
-		fmt.Println(err)
+	var ctx = context.Background()
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     config.Get().RedisAddr,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	val, err := rdb.Get(ctx, searchKey+"_"+offset).Result()
+
+	if err == redis.Nil {
+
+	} else if err != nil {
+		panic(err)
+	} else {
+		fmt.Println(val)
+		fmt.Println("\n\n\n")
+		err = json.Unmarshal([]byte(val), &result)
+		if err != nil {
+			panic(err)
+		}
+		return result, err
 	}
 
 	url := "https://gateway.marvel.com/v1/public/characters?limit=" + limit + "&offset=" + offset + "&nameStartsWith=" + searchKey + "&ts=1661705205195&apikey=ce021c5ac52ea1591e09548b6043d2c7&hash=feb2ab81114c86cb8866d8de2cb13a0e"
@@ -137,6 +158,9 @@ func (s *ComicService) SearchCharacter(searchKey string, offset string, limit st
 		fmt.Println(err)
 	}
 	res, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
 
 	defer res.Body.Close()
 
@@ -153,16 +177,29 @@ func (s *ComicService) SearchCharacter(searchKey string, offset string, limit st
 		tempSearchCharResp = append(tempSearchCharResp, tempCharacter)
 	}
 
-	result.characters = tempSearchCharResp
-	result.offset = tempRes.Data.Offset
+	result.Characters = tempSearchCharResp
+	result.Offset = tempRes.Data.Offset
 
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	//fmt.Println(result)
-	return result, err
-}
 
-func (s *ComicService) GetChracterRedisKey(keyword string, offset string) string {
-	return "CS:keyword:offset" + keyword + offset
+	red := &result
+	b, err := json.Marshal(red)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(string(b))
+	//bodyBytes, err := ioutil.ReadAll(res.Body)
+	//bodyString := string(bodyBytes)
+	//fmt.Println(bodyString)
+	//bodyString = fmt.Sprintf("%#v", bodyString)
+
+	err = rdb.Set(ctx, searchKey+"_"+offset, string(b), 0).Err()
+	if err != nil {
+		panic(err)
+	}
+	return result, err
+
 }
