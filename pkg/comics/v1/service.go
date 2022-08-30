@@ -124,7 +124,7 @@ func (s *ComicService) GetComic() (result []GetComicApiResponse, err error) {
 }
 
 func (s *ComicService) SearchCharacter(searchKey string, offset string, limit string) (result SearchCharacterApiResponse, err error) {
-
+	//initialised redis for caching
 	var ctx = context.Background()
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     config.Get().RedisAddr,
@@ -132,23 +132,27 @@ func (s *ComicService) SearchCharacter(searchKey string, offset string, limit st
 		DB:       0,  // use default DB
 	})
 
+	//gets value for an offset if it is stored in cache.
+	/*
+		Better way to approach here could have been
+		to get max data from Marvel API i.e. 100 and
+		send to user using offsets
+	*/
 	val, err := rdb.Get(ctx, searchKey+"_"+offset).Result()
 
 	if err == redis.Nil {
-
 	} else if err != nil {
 		panic(err)
 	} else {
-		fmt.Println(val)
-		fmt.Println("\n\n\n")
+		//in case data is found in the cache, returns the data to the user
 		err = json.Unmarshal([]byte(val), &result)
 		if err != nil {
 			panic(err)
 		}
 		return result, err
 	}
-
-	url := "https://gateway.marvel.com/v1/public/characters?limit=" + limit + "&offset=" + offset + "&nameStartsWith=" + searchKey + "&ts=1661705205195&apikey=ce021c5ac52ea1591e09548b6043d2c7&hash=feb2ab81114c86cb8866d8de2cb13a0e"
+	//otherwise send a request to marvel api for data
+	url := "https://gateway.marvel.com/v1/public/characters?limit=" + limit + "&offset=" + offset + "&nameStartsWith=" + searchKey + "&ts=1661705205195&apikey=" + config.Get().MarvelApiKey + "&hash=feb2ab81114c86cb8866d8de2cb13a0e"
 	method := "GET"
 
 	client := &http.Client{}
@@ -185,18 +189,14 @@ func (s *ComicService) SearchCharacter(searchKey string, offset string, limit st
 	}
 
 	red := &result
-	b, err := json.Marshal(red)
+	redisSetString, err := json.Marshal(red)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(string(b))
-	//bodyBytes, err := ioutil.ReadAll(res.Body)
-	//bodyString := string(bodyBytes)
-	//fmt.Println(bodyString)
-	//bodyString = fmt.Sprintf("%#v", bodyString)
 
-	err = rdb.Set(ctx, searchKey+"_"+offset, string(b), 0).Err()
+	//sets redis key
+	err = rdb.Set(ctx, searchKey+"_"+offset, string(redisSetString), 0).Err()
 	if err != nil {
 		panic(err)
 	}

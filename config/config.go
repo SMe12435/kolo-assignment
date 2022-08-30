@@ -7,10 +7,11 @@ import (
 )
 
 type Config struct {
-	AppName    string
-	AppEnv     string
-	RedisAddr  string
-	ServerPort string
+	AppName      string
+	AppEnv       string
+	RedisAddr    string
+	ServerPort   string
+	MarvelApiKey string
 }
 
 var config Config
@@ -44,6 +45,7 @@ func init() {
 	config.AppEnv = appEnv
 	config.RedisAddr = os.Getenv("REDIS_ADDR")
 	config.ServerPort = os.Getenv("SERVER_PORT")
+	config.MarvelApiKey = os.Getenv("MARVEL_API_KEY")
 
 }
 
